@@ -1,0 +1,51 @@
+version: "3"
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    restart: unless-stopped
+    ports:
+      - ${DB_PORT}:1433
+    environment:
+      MSSQL_SA_PASSWORD: ${DB_PASSWORD}
+      ACCEPT_EULA: Y
+    healthcheck:
+      test:
+        - CMD
+        - /opt/mssql-tools/bin/sqlcmd
+        - -S
+        - localhost
+        - -U
+        - ${DB_USER}
+        - -P
+        - ${DB_PASSWORD}
+        - -Q
+        - SELECT 1
+        - -b
+        - -o
+        - /dev/null
+      timeout: 5s
+      interval: 10s
+      retries: 10
+      start_period: 10s
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - ${JAEGER_AGENT_PORT}:${JAEGER_AGENT_PORT}
+      - 14268:14268
+      - 14250:4317
+  opentelemetry:
+    image: otel/opentelemetry-collector:latest
+    ports:
+      - ${OTEL_COLLECTOR_PORT_GRPC}:${OTEL_COLLECTOR_PORT_GRPC}
+      - ${OTEL_COLLECTOR_PORT_HTTP}:${OTEL_COLLECTOR_PORT_HTTP}
+      - 1888:1888
+      - 13133:13133
+      - 55670:55679
+    volumes:
+      - ./otel-config.yml:/etc/otel-config.yml
+    command:
+      - --config=/etc/otel-config.yml
+    depends_on:
+      - jaeger
+volumes:
+  mssql: ~
